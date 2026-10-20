@@ -55,7 +55,7 @@ const FINGERINGS = {
   83: ["2", []],
   84: ["0", []],
 };
-const FINGERING_KEYS = Object.keys(FINGERINGS).map(Number).sort$(a, b) => a - b$;
+const FINGERING_KEYS = Object.keys(FINGERINGS).map(Number).sort((a, b) => a - b);
 
 const SLIDE_NOTES = {
   54: "第3スライドを抜いて音程を下げる",
@@ -64,7 +64,7 @@ const SLIDE_NOTES = {
   62: "第3スライドを抜いて音程を下げる",
 };
 
-// 運指ごとに下がる半音数（数値風のキーは並び順が変わるため順序は配列で保持）
+// 運指の並び順と、運指ごとに下がる半音数
 const VALVE_COMBOS = ["0", "2", "1", "12", "23", "13", "123"];
 const VALVE_SEMITONES = { "0": 0, "2": 1, "1": 2, "12": 3, "23": 4, "13": 5, "123": 6 };
 
@@ -124,16 +124,18 @@ const TAB_IDS = ["tuner", "metronome", "fingering", "scale", "transpose", "slur"
    ユーティリティ
    ========================================================= */
 
-const $ = (id) => document.getElementById(id);
+function byId(id) {
+  return document.getElementById(id);
+}
 
 const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 
 function escapeHTML(value) {
-  return String(value).replace$/[&<>"']/g, (c) => HTML_ESCAPES[c]$;
+  return String(value).replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
 }
 
 function mod(n, m) {
-  return $(n % m) + m$ % m;
+  return ((n % m) + m) % m;
 }
 
 function clamp(v, lo, hi) {
@@ -158,50 +160,54 @@ function saveJSON(key, value) {
 }
 
 function isoDate(date) {
-  const d = new Date$date.getTime() - date.getTimezoneOffset() * 60000$;
+  const d = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
   return d.toISOString().slice(0, 10);
 }
 
 function daysAgoISO(days) {
   const d = new Date();
-  d.setDate$d.getDate() - days$;
+  d.setDate(d.getDate() - days);
   return isoDate(d);
 }
 
+function newId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
 function median(values) {
-  const s = [...values].sort$(a, b) => a - b$;
+  const s = [...values].sort((a, b) => a - b);
   const mid = Math.floor(s.length / 2);
-  return s.length % 2 ? s[mid] : $s[mid - 1] + s[mid]$ / 2;
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
 function stdDev(values) {
   if (!values.length) return 0;
-  const mean = values.reduce$(a, b) => a + b, 0$ / values.length;
-  return Math.sqrt(values.reduce$(a, b) => a + (b - mean) ** 2, 0$ / values.length);
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  return Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length);
 }
 
 function tableHTML(columns, rows) {
-  const head = columns.map$(c) => `<th>${escapeHTML(c)}</th>`$.join("");
+  const head = columns.map((c) => "<th>" + escapeHTML(c) + "</th>").join("");
   const body = rows
     .map((row, i) => {
       const cells = columns
         .map((c) => {
           const v = row[c];
-          if $v && typeof v === "object" && "html" in v$ return `<td>${v.html}</td>`;
-          return `<td>${escapeHTML(v ?? "")}</td>`;
+          if (v && typeof v === "object" && "html" in v) return "<td>" + v.html + "</td>";
+          return "<td>" + escapeHTML(v ?? "") + "</td>";
         })
         .join("");
-      return `<tr data-index="${i}">${cells}</tr>`;
+      return '<tr data-index="' + i + '">' + cells + "</tr>";
     })
     .join("");
-  return `<table class="data-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+  return '<table class="data-table"><thead><tr>' + head + "</tr></thead><tbody>" + body + "</tbody></table>";
 }
 
 function fillSelect(select, items, selectedValue) {
   select.innerHTML = items
-    .map$([value, label]) => `<option value="${escapeHTML(value)}">${escapeHTML(label)}</option>`$
+    .map(([value, label]) => '<option value="' + escapeHTML(value) + '">' + escapeHTML(label) + "</option>")
     .join("");
-  if $selectedValue !== undefined$ select.value = String(selectedValue);
+  if (selectedValue !== undefined) select.value = String(selectedValue);
 }
 
 /* =========================================================
@@ -215,13 +221,14 @@ const settings = Object.assign(
 if (!(settings.instrument in INSTRUMENTS)) settings.instrument = "B♭トランペット";
 settings.a4 = clamp(Number(settings.a4) || 442, 430, 450);
 settings.volume = clamp(Number(settings.volume) || 0.5, 0.05, 1);
+settings.useFlats = settings.useFlats !== false;
 
 function saveSettings() {
   saveJSON(STORAGE_SETTINGS, settings);
 }
 
-function transposeOf$name = settings.instrument$ {
-  return INSTRUMENTS[name];
+function transposeOf(name) {
+  return INSTRUMENTS[name || settings.instrument];
 }
 
 function noteNames() {
@@ -229,11 +236,11 @@ function noteNames() {
 }
 
 function midiToName(m) {
-  return noteNames()[mod(m, 12)] + $Math.floor(m / 12) - 1$;
+  return noteNames()[mod(m, 12)] + (Math.floor(m / 12) - 1);
 }
 
 function midiToFreq(m) {
-  return settings.a4 * Math.pow(2, $m - 69$ / 12);
+  return settings.a4 * Math.pow(2, (m - 69) / 12);
 }
 
 function freqToMidiFloat(f) {
@@ -241,22 +248,26 @@ function freqToMidiFloat(f) {
 }
 
 function valveText(combo) {
-  return combo === "0" ? "開放" : combo.split("").join$"+"$;
+  return combo === "0" ? "開放" : combo.split("").join("+");
 }
 
 function valveSymbols(combo) {
-  if $combo === "0"$ return "○ ○ ○（開放）";
+  if (combo === "0") return "○ ○ ○（開放）";
   return [1, 2, 3].map((v) => (combo.includes(String(v)) ? "●" : "○")).join(" ");
 }
 
-function valveHTML$combo, size = ""$ {
+function valveHTML(combo, size) {
   const valves = [1, 2, 3]
     .map((v) => {
       const pressed = combo !== "0" && combo.includes(String(v));
-      return `<div class="valve${pressed ? " pressed" : ""}">${v}</div>`;
+      return '<div class="valve' + (pressed ? " pressed" : "") + '">' + v + "</div>";
     })
     .join("");
-  return `<div class="valves ${size}">${valves}</div>`;
+  return '<div class="valves ' + (size || "") + '">' + valves + "</div>";
+}
+
+function valveCellHTML(combo) {
+  return valveHTML(combo, "small") + '<span class="quiz-label">' + escapeHTML(valveText(combo)) + "</span>";
 }
 
 /* =========================================================
@@ -283,11 +294,12 @@ function getCtx() {
     const imag = Float32Array.from(harmonics);
     trumpetWave = audioCtx.createPeriodicWave(real, imag);
   }
-  if $audioCtx.state === "suspended"$ audioCtx.resume();
+  if (audioCtx.state === "suspended") audioCtx.resume();
   return audioCtx;
 }
 
-function playTone$freq, start, duration, peak = 0.35$ {
+function playTone(freq, start, duration, peak) {
+  const level = peak || 0.35;
   const ctx = getCtx();
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -296,13 +308,13 @@ function playTone$freq, start, duration, peak = 0.35$ {
   const attack = Math.min(0.03, duration / 3);
   const release = Math.min(0.06, duration / 3);
   gain.gain.setValueAtTime(0, start);
-  gain.gain.linearRampToValueAtTime$peak, start + attack$;
-  gain.gain.setValueAtTime$peak, start + duration - release$;
-  gain.gain.linearRampToValueAtTime$0, start + duration$;
+  gain.gain.linearRampToValueAtTime(level, start + attack);
+  gain.gain.setValueAtTime(level, start + duration - release);
+  gain.gain.linearRampToValueAtTime(0, start + duration);
   osc.connect(gain);
   gain.connect(masterGain);
   osc.start(start);
-  osc.stop$start + duration + 0.02$;
+  osc.stop(start + duration + 0.02);
   const voice = { osc, gain };
   activeVoices.add(voice);
   osc.onended = () => {
@@ -321,7 +333,7 @@ function stopSequence() {
       try {
         v.gain.gain.cancelScheduledValues(now);
         v.gain.gain.setTargetAtTime(0, now, 0.01);
-        v.osc.stop$now + 0.06$;
+        v.osc.stop(now + 0.06);
       } catch (e) {
         /* 停止済みのノードは無視 */
       }
@@ -341,31 +353,31 @@ function playSequence(writtenNotes, bpm, owner) {
   const t0 = ctx.currentTime + lead;
   const shift = transposeOf();
   writtenNotes.forEach((m, i) => {
-    playTone$midiToFreq(m - shift), t0 + i * beat, beat * 0.92$;
+    playTone(midiToFreq(m - shift), t0 + i * beat, beat * 0.92);
     if (owner.onNote) {
-      sequenceTimers.push(setTimeout$() => owner.onNote(i), (lead + i * beat) * 1000$);
+      sequenceTimers.push(setTimeout(() => owner.onNote(i), (lead + i * beat) * 1000));
     }
   });
   sequenceOwner = owner;
   sequenceTimers.push(
     setTimeout(() => {
       sequenceTimers = [];
-      if $sequenceOwner === owner$ {
+      if (sequenceOwner === owner) {
         sequenceOwner = null;
         if (owner.onStop) owner.onStop();
       }
-    }, $lead + writtenNotes.length * beat$ * 1000 + 80)
+    }, (lead + writtenNotes.length * beat) * 1000 + 80)
   );
 }
 
 function clearRowHighlights() {
-  document.querySelectorAll("tr.current").forEach$(tr) => tr.classList.remove("current")$;
+  document.querySelectorAll("tr.current").forEach((tr) => tr.classList.remove("current"));
 }
 
 function highlightRow(containerId, index) {
-  const container = $(containerId);
-  container.querySelectorAll("tr.current").forEach$(tr) => tr.classList.remove("current")$;
-  const row = container.querySelector$`tbody tr[data-index="${index}"]`$;
+  const container = byId(containerId);
+  container.querySelectorAll("tr.current").forEach((tr) => tr.classList.remove("current"));
+  const row = container.querySelector('tbody tr[data-index="' + index + '"]');
   if (row) {
     row.classList.add("current");
     row.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -373,7 +385,7 @@ function highlightRow(containerId, index) {
 }
 
 function togglePlayback(id, button, notes, bpm, onNote) {
-  if $sequenceOwner && sequenceOwner.id === id$ {
+  if (sequenceOwner && sequenceOwner.id === id) {
     stopSequence();
     return;
   }
@@ -399,7 +411,7 @@ function startDrone(freq) {
   osc.setPeriodicWave(trumpetWave);
   osc.frequency.value = freq;
   gain.gain.setValueAtTime(0, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime$0.3, ctx.currentTime + 0.08$;
+  gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.08);
   osc.connect(gain);
   gain.connect(masterGain);
   osc.start();
@@ -413,8 +425,8 @@ function stopDrone() {
   drone = null;
   d.gain.gain.cancelScheduledValues(now);
   d.gain.gain.setValueAtTime(d.gain.gain.value, now);
-  d.gain.gain.linearRampToValueAtTime$0, now + 0.08$;
-  d.osc.stop$now + 0.1$;
+  d.gain.gain.linearRampToValueAtTime(0, now + 0.08);
+  d.osc.stop(now + 0.1);
 }
 
 /* =========================================================
@@ -424,12 +436,12 @@ function stopDrone() {
 let currentTab = "tuner";
 
 function initSettings() {
-  const sel = $("instrument");
-  fillSelect(sel, Object.keys(INSTRUMENTS).map$(n) => [n, n]$, settings.instrument);
-  $("a4").value = settings.a4;
-  $$"a4-value"$.textContent = settings.a4.toFixed(1);
-  $("volume").value = settings.volume;
-  $$"use-flats"$.checked = settings.useFlats;
+  const sel = byId("instrument");
+  fillSelect(sel, Object.keys(INSTRUMENTS).map((n) => [n, n]), settings.instrument);
+  byId("a4").value = settings.a4;
+  byId("a4-value").textContent = settings.a4.toFixed(1);
+  byId("volume").value = settings.volume;
+  byId("use-flats").checked = settings.useFlats;
 
   sel.addEventListener("change", () => {
     settings.instrument = sel.value;
@@ -437,20 +449,20 @@ function initSettings() {
     renderAll();
   });
 
-  $("a4").addEventListener("input", (e) => {
+  byId("a4").addEventListener("input", (e) => {
     settings.a4 = parseFloat(e.target.value);
-    $$"a4-value"$.textContent = settings.a4.toFixed(1);
+    byId("a4-value").textContent = settings.a4.toFixed(1);
     saveSettings();
     updateRefInfo();
   });
 
-  $("volume").addEventListener("input", (e) => {
+  byId("volume").addEventListener("input", (e) => {
     settings.volume = parseFloat(e.target.value);
     if (masterGain) masterGain.gain.setTargetAtTime(settings.volume, audioCtx.currentTime, 0.02);
     saveSettings();
   });
 
-  $$"use-flats"$.addEventListener("change", (e) => {
+  byId("use-flats").addEventListener("change", (e) => {
     settings.useFlats = e.target.checked;
     saveSettings();
     renderAll();
@@ -459,24 +471,25 @@ function initSettings() {
 
 function updateTransposeInfo() {
   const t = transposeOf();
-  $("transpose-info").textContent = `${settings.instrument}: 記譜音 = 実音 ${t >= 0 ? "+" : ""}${t} 半音`;
+  byId("transpose-info").textContent =
+    settings.instrument + ": 記譜音 = 実音 " + (t >= 0 ? "+" : "") + t + " 半音";
 }
 
 function initTabs() {
   document.querySelectorAll(".tab").forEach((btn) => {
-    btn.addEventListener$"click", () => activateTab(btn.dataset.tab)$;
+    btn.addEventListener("click", () => activateTab(btn.dataset.tab, true));
   });
   const initial = location.hash.replace("#", "");
   activateTab(TAB_IDS.includes(initial) ? initial : "tuner", false);
 }
 
-function activateTab$id, updateHash = true$ {
+function activateTab(id, updateHash) {
   currentTab = id;
-  document.querySelectorAll(".tab").forEach$(b) => b.classList.toggle("active", b.dataset.tab === id)$;
-  document.querySelectorAll(".panel").forEach$(p) => p.classList.toggle("active", p.id === `tab-${id}`)$;
-  if (updateHash) history.replaceState(null, "", `#${id}`);
-  if $id === "tuner"$ drawStability();
-  if $id === "log"$ renderLog();
+  document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === id));
+  document.querySelectorAll(".panel").forEach((p) => p.classList.toggle("active", p.id === "tab-" + id));
+  if (updateHash) history.replaceState(null, "", "#" + id);
+  if (id === "tuner") drawStability();
+  if (id === "log") renderLog();
 }
 
 /* =========================================================
@@ -513,38 +526,44 @@ function arcPath(r, a1, a2) {
   const [x1, y1] = polar(r, a1);
   const [x2, y2] = polar(r, a2);
   const large = Math.abs(a2 - a1) > 180 ? 1 : 0;
-  return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+  return (
+    "M " + x1.toFixed(2) + " " + y1.toFixed(2) +
+    " A " + r + " " + r + " 0 " + large + " 1 " + x2.toFixed(2) + " " + y2.toFixed(2)
+  );
 }
 
 function initGauge() {
   const maxDeg = 50 * DEG_PER_CENT;
-  let svg = `<path class="gauge-zone" d="${arcPath(GAUGE_R, -5 * DEG_PER_CENT, 5 * DEG_PER_CENT)}"/>`;
-  svg += `<path class="gauge-arc" d="${arcPath(GAUGE_R, -maxDeg, maxDeg)}"/>`;
+  let svg = '<path class="gauge-zone" d="' + arcPath(GAUGE_R, -5 * DEG_PER_CENT, 5 * DEG_PER_CENT) + '"/>';
+  svg += '<path class="gauge-arc" d="' + arcPath(GAUGE_R, -maxDeg, maxDeg) + '"/>';
   for (let c = -50; c <= 50; c += 10) {
     const major = c % 50 === 0;
     const deg = c * DEG_PER_CENT;
     const [x1, y1] = polar(GAUGE_R - 6, deg);
     const [x2, y2] = polar(GAUGE_R - (major ? 22 : 14), deg);
-    svg += `<line class="gauge-tick${major ? " major" : ""}" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/>`;
+    svg +=
+      '<line class="gauge-tick' + (major ? " major" : "") + '"' +
+      ' x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '"' +
+      ' x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '"/>';
   }
   [-50, 0, 50].forEach((c) => {
     const [x, y] = polar(GAUGE_R + 14, c * DEG_PER_CENT);
-    const label = c > 0 ? `+${c}` : c < 0 ? `−${-c}` : "0";
-    svg += `<text class="gauge-label" x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}">${label}</text>`;
+    const label = c > 0 ? "+" + c : c < 0 ? "−" + -c : "0";
+    svg += '<text class="gauge-label" x="' + x.toFixed(1) + '" y="' + (y + 4).toFixed(1) + '">' + label + "</text>";
   });
-  $("gauge-ticks").innerHTML = svg;
+  byId("gauge-ticks").innerHTML = svg;
 }
 
 function setNeedle(cents, state) {
-  const needle = $("needle");
-  needle.style.transform = `rotate(${clamp(cents, -50, 50) * DEG_PER_CENT}deg)`;
-  needle.setAttribute("class", `needle ${state}`);
+  const needle = byId("needle");
+  needle.style.transform = "rotate(" + clamp(cents, -50, 50) * DEG_PER_CENT + "deg)";
+  needle.setAttribute("class", "needle " + state);
 }
 
-function setTunerStatus(text, cls = "") {
-  const el = $("tuner-status");
+function setTunerStatus(text, cls) {
+  const el = byId("tuner-status");
   el.textContent = text;
-  el.className = `tuner-status ${cls}`;
+  el.className = "tuner-status " + (cls || "");
 }
 
 function detectPitch(buf, sr, gate) {
@@ -613,16 +632,16 @@ function detectPitch(buf, sr, gate) {
 }
 
 function initTuner() {
-  $("tuner-toggle").addEventListener("click", () => {
+  byId("tuner-toggle").addEventListener("click", () => {
     if (tuner.stream) stopTuner();
     else startTuner();
   });
-  $("tuner-gate").addEventListener("input", (e) => {
+  byId("tuner-gate").addEventListener("input", (e) => {
     tuner.gate = parseFloat(e.target.value);
-    $("tuner-gate-value").textContent = tuner.gate.toFixed(3);
+    byId("tuner-gate-value").textContent = tuner.gate.toFixed(3);
   });
-  tuner.gate = parseFloat($("tuner-gate").value);
-  $("tuner-gate-value").textContent = tuner.gate.toFixed(3);
+  tuner.gate = parseFloat(byId("tuner-gate").value);
+  byId("tuner-gate-value").textContent = tuner.gate.toFixed(3);
   showTunerIdle(false);
 }
 
@@ -641,7 +660,7 @@ async function startTuner() {
     const msg =
       e.name === "NotAllowedError"
         ? "マイクの使用が許可されませんでした。ブラウザの設定で許可してください。"
-        : `マイクを開始できませんでした（${e.name}）。`;
+        : "マイクを開始できませんでした（" + e.name + "）。";
     setTunerStatus(msg, "error");
     return;
   }
@@ -655,7 +674,7 @@ async function startTuner() {
   tuner.silent = 0;
   tuner.lastUpdate = 0;
 
-  const btn = $("tuner-toggle");
+  const btn = byId("tuner-toggle");
   btn.textContent = "■ 停止";
   btn.classList.add("playing");
   showTunerIdle(true);
@@ -670,7 +689,7 @@ function stopTuner() {
   tuner.stream = null;
   tuner.source = null;
   tuner.analyser = null;
-  const btn = $("tuner-toggle");
+  const btn = byId("tuner-toggle");
   btn.textContent = "🎤 マイク開始";
   btn.classList.remove("playing");
   showTunerIdle(false);
@@ -697,11 +716,11 @@ function tunerLoop(ts) {
 }
 
 function showTunerIdle(listening) {
-  $("tuner-readout").classList.add("idle");
-  $("tuner-written").textContent = "--";
-  $("tuner-concert").textContent = "--";
-  $("tuner-freq").textContent = "--";
-  $("tuner-cents").textContent = "--";
+  byId("tuner-readout").classList.add("idle");
+  byId("tuner-written").textContent = "--";
+  byId("tuner-concert").textContent = "--";
+  byId("tuner-freq").textContent = "--";
+  byId("tuner-cents").textContent = "--";
   setNeedle(0, "idle");
   if (listening) setTunerStatus("音を待っています…");
   else setTunerStatus("「マイク開始」を押してロングトーンを吹いてください。");
@@ -713,11 +732,11 @@ function showPitch(freq) {
   const cents = (midiF - midi) * 100;
   const written = midi + transposeOf();
 
-  $("tuner-readout").classList.remove("idle");
-  $("tuner-written").textContent = midiToName(written);
-  $("tuner-concert").textContent = midiToName(midi);
-  $("tuner-freq").textContent = `${freq.toFixed(1)} Hz`;
-  $("tuner-cents").textContent = `${cents >= 0 ? "+" : "−"}${Math.abs(cents).toFixed(1)}`;
+  byId("tuner-readout").classList.remove("idle");
+  byId("tuner-written").textContent = midiToName(written);
+  byId("tuner-concert").textContent = midiToName(midi);
+  byId("tuner-freq").textContent = freq.toFixed(1) + " Hz";
+  byId("tuner-cents").textContent = (cents >= 0 ? "+" : "−") + Math.abs(cents).toFixed(1);
 
   if (Math.abs(cents) <= 5) {
     setNeedle(cents, "in-tune");
@@ -736,7 +755,7 @@ function showPitch(freq) {
 }
 
 function drawStability() {
-  const canvas = $("stability-canvas");
+  const canvas = byId("stability-canvas");
   const w = canvas.clientWidth;
   const h = canvas.clientHeight;
   if (!w || !h) return;
@@ -768,7 +787,7 @@ function drawStability() {
     g.lineTo(w, y);
     g.stroke();
     g.fillStyle = "rgba(138, 164, 200, 0.8)";
-    g.fillText(c > 0 ? `+${c}` : String(c), 6, clamp(y, 8, h - 8));
+    g.fillText(c > 0 ? "+" + c : String(c), 6, clamp(y, 8, h - 8));
   });
 
   const hist = tuner.history;
@@ -793,7 +812,7 @@ function drawStability() {
   }
 
   const recent = hist.slice(-60);
-  $("stability-std").textContent = recent.length >= 5 ? `${stdDev(recent).toFixed(1)} cent` : "--";
+  byId("stability-std").textContent = recent.length >= 5 ? stdDev(recent).toFixed(1) + " cent" : "--";
 }
 
 /* =========================================================
@@ -801,36 +820,33 @@ function drawStability() {
    ========================================================= */
 
 function initRef() {
-  $("ref-note").addEventListener("change", updateRefInfo);
-  $("ref-toggle").addEventListener("click", () => {
-    if (drone) {
-      stopDrone();
-    } else {
-      startDrone(midiToFreq(refConcert()));
-    }
+  byId("ref-note").addEventListener("change", updateRefInfo);
+  byId("ref-toggle").addEventListener("click", () => {
+    if (drone) stopDrone();
+    else startDrone(midiToFreq(refConcert()));
     updateRefButton();
   });
 }
 
 function refreshRefOptions() {
-  const sel = $("ref-note");
+  const sel = byId("ref-note");
   const current = sel.value || "60";
   fillSelect(sel, FINGERING_KEYS.map((m) => [m, midiToName(m)]), current);
 }
 
 function refConcert() {
-  return Number($("ref-note").value || 60) - transposeOf();
+  return Number(byId("ref-note").value || 60) - transposeOf();
 }
 
 function updateRefInfo() {
   const concert = refConcert();
   const freq = midiToFreq(concert);
-  $("ref-info").textContent = `実音: ${midiToName(concert)}（${freq.toFixed(2)} Hz）`;
+  byId("ref-info").textContent = "実音: " + midiToName(concert) + "（" + freq.toFixed(2) + " Hz）";
   if (drone && audioCtx) drone.osc.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.02);
 }
 
 function updateRefButton() {
-  const btn = $("ref-toggle");
+  const btn = byId("ref-toggle");
   btn.textContent = drone ? "■ 停止" : "▶ 再生";
   btn.classList.toggle("playing", !!drone);
 }
@@ -858,43 +874,43 @@ const metro = {
 
 function initMetronome() {
   fillSelect(
-    $("metro-beats"),
-    Array.from({ length: 12 }, (_, i) => [i + 1, `${i + 1}拍`]),
+    byId("metro-beats"),
+    Array.from({ length: 12 }, (_, i) => [i + 1, i + 1 + "拍"]),
     4
   );
 
-  $("bpm-range").addEventListener("input", (e) => setBpm(e.target.value));
-  $("bpm-input").addEventListener("change", (e) => setBpm(e.target.value));
+  byId("bpm-range").addEventListener("input", (e) => setBpm(e.target.value));
+  byId("bpm-input").addEventListener("change", (e) => setBpm(e.target.value));
   document.querySelectorAll("[data-bpm-step]").forEach((btn) => {
     btn.addEventListener("click", () => setBpm(metro.bpm + Number(btn.dataset.bpmStep)));
   });
 
-  $("metro-beats").addEventListener("change", (e) => {
+  byId("metro-beats").addEventListener("change", (e) => {
     metro.beats = Number(e.target.value);
     renderDots();
   });
-  $("metro-subdiv").addEventListener("change", (e) => {
+  byId("metro-subdiv").addEventListener("change", (e) => {
     metro.subdiv = Number(e.target.value);
   });
-  $("metro-accent").addEventListener("change", (e) => {
+  byId("metro-accent").addEventListener("change", (e) => {
     metro.accent = e.target.checked;
     renderDots();
   });
 
-  $("metro-toggle").addEventListener("click", () => {
+  byId("metro-toggle").addEventListener("click", () => {
     if (metro.running) stopMetro();
     else startMetro();
   });
-  $("metro-tap").addEventListener("click", tapTempo);
+  byId("metro-tap").addEventListener("click", tapTempo);
 
   ["trainer-start", "trainer-target", "trainer-step", "trainer-bars"].forEach((id) => {
-    $(id).addEventListener("input", renderTrainerPlan);
+    byId(id).addEventListener("input", renderTrainerPlan);
   });
-  $("trainer-set").addEventListener("click", () => {
+  byId("trainer-set").addEventListener("click", () => {
     setBpm(trainerValues().start);
     metro.barsSinceChange = 0;
   });
-  $("trainer-auto").addEventListener("change", () => {
+  byId("trainer-auto").addEventListener("change", () => {
     metro.barsSinceChange = 0;
   });
 
@@ -914,26 +930,26 @@ function initMetronome() {
 function setBpm(value) {
   const n = Number(value);
   metro.bpm = clamp(Math.round(Number.isFinite(n) ? n : metro.bpm), 20, 300);
-  $("bpm-value").textContent = metro.bpm;
-  $("bpm-range").value = metro.bpm;
-  $("bpm-input").value = metro.bpm;
+  byId("bpm-value").textContent = metro.bpm;
+  byId("bpm-range").value = metro.bpm;
+  byId("bpm-input").value = metro.bpm;
   renderTrainerPlan();
 }
 
 function renderDots() {
-  $("beat-dots").innerHTML = Array.from(
+  byId("beat-dots").innerHTML = Array.from(
     { length: metro.beats },
-    (_, i) => `<div class="dot${i === 0 && metro.accent ? " accent" : ""}"></div>`
+    (_, i) => '<div class="dot' + (i === 0 && metro.accent ? " accent" : "") + '"></div>'
   ).join("");
 }
 
 function scheduleClick(type, time) {
-  const settingsByType = {
+  const clickTypes = {
     accent: [1600, 0.9],
     beat: [1000, 0.7],
     sub: [700, 0.35],
   };
-  const [freq, vol] = settingsByType[type];
+  const [freq, vol] = clickTypes[type];
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
   osc.type = "sine";
@@ -976,12 +992,12 @@ function metroScheduler() {
 }
 
 function onBarComplete() {
-  if (!$("trainer-auto").checked) return;
+  if (!byId("trainer-auto").checked) return;
   metro.barsSinceChange++;
-  const { target, step, bars } = trainerValues();
-  if (metro.barsSinceChange >= bars) {
+  const tv = trainerValues();
+  if (metro.barsSinceChange >= tv.bars) {
     metro.barsSinceChange = 0;
-    if (metro.bpm < target) setBpm(Math.min(metro.bpm + step, target));
+    if (metro.bpm < tv.target) setBpm(Math.min(metro.bpm + tv.step, tv.target));
   }
 }
 
@@ -994,7 +1010,7 @@ function metroDraw() {
 }
 
 function flashDot(index) {
-  const dots = $("beat-dots").children;
+  const dots = byId("beat-dots").children;
   for (const d of dots) d.classList.remove("on");
   const dot = dots[index];
   if (!dot) return;
@@ -1014,7 +1030,7 @@ function startMetro() {
   metro.timer = setInterval(metroScheduler, 25);
   metroScheduler();
   metro.raf = requestAnimationFrame(metroDraw);
-  const btn = $("metro-toggle");
+  const btn = byId("metro-toggle");
   btn.textContent = "■ ストップ";
   btn.classList.add("playing");
 }
@@ -1027,8 +1043,8 @@ function stopMetro() {
   metro.raf = null;
   metro.queue = [];
   metro.running = false;
-  for (const d of $("beat-dots").children) d.classList.remove("on");
-  const btn = $("metro-toggle");
+  for (const d of byId("beat-dots").children) d.classList.remove("on");
+  const btn = byId("metro-toggle");
   btn.textContent = "▶ スタート";
   btn.classList.remove("playing");
 }
@@ -1047,7 +1063,7 @@ function tapTempo() {
 
 function trainerValues() {
   const num = (id, lo, hi, def) => {
-    const v = parseInt($(id).value, 10);
+    const v = parseInt(byId(id).value, 10);
     return Number.isFinite(v) ? clamp(v, lo, hi) : def;
   };
   return {
@@ -1059,16 +1075,16 @@ function trainerValues() {
 }
 
 function renderTrainerPlan() {
-  const { start, target, step } = trainerValues();
-  const el = $("trainer-plan");
-  if (target <= start) {
+  const tv = trainerValues();
+  const el = byId("trainer-plan");
+  if (tv.target <= tv.start) {
     el.textContent = "目標テンポは開始テンポより大きくしてください。";
     return;
   }
   const plan = [];
-  for (let b = start; b <= target; b += step) plan.push(b);
-  if (plan[plan.length - 1] !== target) plan.push(target);
-  el.innerHTML = plan.map((b) => (b === metro.bpm ? `<strong>[${b}]</strong>` : String(b))).join(" → ");
+  for (let b = tv.start; b <= tv.target; b += tv.step) plan.push(b);
+  if (plan[plan.length - 1] !== tv.target) plan.push(tv.target);
+  el.innerHTML = plan.map((b) => (b === metro.bpm ? "<strong>[" + b + "]</strong>" : String(b))).join(" → ");
 }
 
 /* =========================================================
@@ -1085,32 +1101,32 @@ const quiz = {
 };
 
 function initFingering() {
-  const slider = $("fing-slider");
+  const slider = byId("fing-slider");
   slider.max = FINGERING_KEYS.length - 1;
   slider.value = fingIndex;
   slider.addEventListener("input", (e) => {
     fingIndex = Number(e.target.value);
     renderFingering();
   });
-  $("fing-prev").addEventListener("click", () => {
+  byId("fing-prev").addEventListener("click", () => {
     fingIndex = Math.max(0, fingIndex - 1);
     renderFingering();
   });
-  $("fing-next").addEventListener("click", () => {
+  byId("fing-next").addEventListener("click", () => {
     fingIndex = Math.min(FINGERING_KEYS.length - 1, fingIndex + 1);
     renderFingering();
   });
-  $("fing-play").addEventListener("click", () => {
+  byId("fing-play").addEventListener("click", () => {
     const ctx = getCtx();
     const m = FINGERING_KEYS[fingIndex];
     playTone(midiToFreq(m - transposeOf()), ctx.currentTime + 0.05, 1.5);
   });
 
-  $("quiz-options").addEventListener("click", (e) => {
+  byId("quiz-options").addEventListener("click", (e) => {
     const btn = e.target.closest("[data-combo]");
     if (btn) answerQuiz(btn.dataset.combo);
   });
-  $("quiz-next").addEventListener("click", () => {
+  byId("quiz-next").addEventListener("click", () => {
     let next = quiz.note;
     while (next === quiz.note) {
       next = FINGERING_KEYS[Math.floor(Math.random() * FINGERING_KEYS.length)];
@@ -1123,72 +1139,76 @@ function initFingering() {
 
 function renderFingering() {
   const m = FINGERING_KEYS[fingIndex];
-  const [main, alts] = FINGERINGS[m];
-  $("fing-slider").value = fingIndex;
-  $("fing-written").textContent = midiToName(m);
-  $("fing-concert").textContent = midiToName(m - transposeOf());
-  $("fing-valves").innerHTML = valveHTML(main);
-  $("fing-text").textContent = `運指: ${valveText(main)}`;
-  $("fing-alt").textContent = alts.length ? `代替運指: ${alts.map(valveText).join(" / ")}` : "";
+  const main = FINGERINGS[m][0];
+  const alts = FINGERINGS[m][1];
+  byId("fing-slider").value = fingIndex;
+  byId("fing-written").textContent = midiToName(m);
+  byId("fing-concert").textContent = midiToName(m - transposeOf());
+  byId("fing-valves").innerHTML = valveHTML(main, "");
+  byId("fing-text").textContent = "運指: " + valveText(main);
+  byId("fing-alt").textContent = alts.length ? "代替運指: " + alts.map(valveText).join(" / ") : "";
 
-  const slide = $("fing-slide");
+  const slide = byId("fing-slide");
   if (SLIDE_NOTES[m]) {
     slide.textContent = SLIDE_NOTES[m];
     slide.classList.remove("hidden");
   } else {
     slide.classList.add("hidden");
   }
-  $("fing-piccolo").classList.toggle("hidden", !settings.instrument.includes("ピッコロ"));
+  byId("fing-piccolo").classList.toggle("hidden", !settings.instrument.includes("ピッコロ"));
 }
 
 function renderFingTable() {
   const shift = transposeOf();
   const rows = FINGERING_KEYS.map((m) => {
-    const [main, alts] = FINGERINGS[m];
+    const main = FINGERINGS[m][0];
+    const alts = FINGERINGS[m][1];
     return {
       "記譜音": midiToName(m),
       "実音": midiToName(m - shift),
-      "運指": { html: `${valveHTML(main, "small")}<span class="quiz-label">${escapeHTML(valveText(main))}</span>` },
+      "運指": { html: valveCellHTML(main) },
       "代替": alts.map(valveText).join(" / "),
     };
   });
-  $("fing-table").innerHTML = tableHTML(["記譜音", "実音", "運指", "代替"], rows);
+  byId("fing-table").innerHTML = tableHTML(["記譜音", "実音", "運指", "代替"], rows);
 }
 
 function renderQuiz() {
-  const [main, alts] = FINGERINGS[quiz.note];
+  const main = FINGERINGS[quiz.note][0];
+  const alts = FINGERINGS[quiz.note][1];
   const answers = [main, ...alts];
-  $("quiz-question").textContent = `記譜音 ${midiToName(quiz.note)} の運指は？`;
-  $("quiz-score").textContent = `${quiz.correct} / ${quiz.total}`;
+  byId("quiz-question").textContent = "記譜音 " + midiToName(quiz.note) + " の運指は？";
+  byId("quiz-score").textContent = quiz.correct + " / " + quiz.total;
 
-  $("quiz-options").innerHTML = VALVE_COMBOS.map((c) => {
+  byId("quiz-options").innerHTML = VALVE_COMBOS.map((c) => {
     let cls = "btn quiz-option";
     if (quiz.selected !== null) {
       if (answers.includes(c)) cls += " correct";
       else if (c === quiz.selected) cls += " wrong";
     }
-    return `<button class="${cls}" data-combo="${c}">${valveHTML(c, "small")}<span class="quiz-label">${escapeHTML(valveText(c))}</span></button>`;
+    return '<button class="' + cls + '" data-combo="' + c + '">' + valveCellHTML(c) + "</button>";
   }).join("");
 
-  const fb = $("quiz-feedback");
+  const fb = byId("quiz-feedback");
   if (quiz.selected === null) {
     fb.className = "alert hidden";
     fb.textContent = "";
     return;
   }
-  const altText = alts.length ? `（代替運指: ${alts.map(valveText).join(" / ")}）` : "";
+  const altText = alts.length ? "（代替運指: " + alts.map(valveText).join(" / ") + "）" : "";
   if (answers.includes(quiz.selected)) {
     fb.className = "alert success";
-    fb.textContent = `正解です！ ${valveText(main)}${altText}`;
+    fb.textContent = "正解です！ " + valveText(main) + altText;
   } else {
     fb.className = "alert error";
-    fb.textContent = `不正解。正解は ${valveText(main)}${altText} です。`;
+    fb.textContent = "不正解。正解は " + valveText(main) + altText + " です。";
   }
 }
 
 function answerQuiz(combo) {
   if (quiz.selected !== null) return;
-  const [main, alts] = FINGERINGS[quiz.note];
+  const main = FINGERINGS[quiz.note][0];
+  const alts = FINGERINGS[quiz.note][1];
   quiz.selected = combo;
   quiz.total++;
   if ([main, ...alts].includes(combo)) quiz.correct++;
@@ -1200,32 +1220,32 @@ function answerQuiz(combo) {
    ========================================================= */
 
 function initScale() {
-  fillSelect($("scale-type"), Object.keys(SCALES).map((s) => [s, s]), "メジャー");
+  fillSelect(byId("scale-type"), Object.keys(SCALES).map((s) => [s, s]), "メジャー");
   ["scale-key", "scale-type", "scale-octave", "scale-direction"].forEach((id) => {
-    $(id).addEventListener("change", renderScale);
+    byId(id).addEventListener("change", renderScale);
   });
-  $("scale-bpm").addEventListener("input", (e) => {
-    $("scale-bpm-value").textContent = e.target.value;
+  byId("scale-bpm").addEventListener("input", (e) => {
+    byId("scale-bpm-value").textContent = e.target.value;
   });
-  $("scale-play").addEventListener("click", () => {
-    togglePlayback("scale", $("scale-play"), scaleNotes(), Number($("scale-bpm").value), (i) =>
+  byId("scale-play").addEventListener("click", () => {
+    togglePlayback("scale", byId("scale-play"), scaleNotes(), Number(byId("scale-bpm").value), (i) =>
       highlightRow("scale-table", i)
     );
   });
 }
 
 function refreshScaleKeys() {
-  const sel = $("scale-key");
+  const sel = byId("scale-key");
   const current = sel.value || "0";
   fillSelect(sel, noteNames().map((n, i) => [i, n]), current);
 }
 
 function scaleNotes() {
-  const root = Number($("scale-key").value || 0);
-  const octave = Number($("scale-octave").value);
+  const root = Number(byId("scale-key").value || 0);
+  const octave = Number(byId("scale-octave").value);
   const rootMidi = 12 * (octave + 1) + root;
-  let notes = SCALES[$("scale-type").value].map((i) => rootMidi + i);
-  if ($("scale-direction").value === "updown") {
+  let notes = SCALES[byId("scale-type").value].map((i) => rootMidi + i);
+  if (byId("scale-direction").value === "updown") {
     notes = notes.concat(notes.slice(0, -1).reverse());
   }
   return notes;
@@ -1242,13 +1262,11 @@ function renderScale() {
     return {
       "記譜音": midiToName(m),
       "実音": midiToName(m - shift),
-      "運指": f
-        ? { html: `${valveHTML(f[0], "small")}<span class="quiz-label">${escapeHTML(valveText(f[0]))}</span>` }
-        : "音域外",
+      "運指": f ? { html: valveCellHTML(f[0]) } : "音域外",
     };
   });
-  $("scale-warning").classList.toggle("hidden", !outOfRange);
-  $("scale-table").innerHTML = tableHTML(["記譜音", "実音", "運指"], rows);
+  byId("scale-warning").classList.toggle("hidden", !outOfRange);
+  byId("scale-table").innerHTML = tableHTML(["記譜音", "実音", "運指"], rows);
 }
 
 /* =========================================================
@@ -1257,11 +1275,11 @@ function renderScale() {
 
 function initTranspose() {
   const instItems = Object.keys(INSTRUMENTS).map((n) => [n, n]);
-  fillSelect($("tr-from"), [["C", "実音（C）"], ...instItems], "C");
-  fillSelect($("tr-to"), instItems, "B♭トランペット");
-  fillSelect($("tr-key"), FLAT_NAMES.map((n, i) => [i, n]), 10);
-  ["tr-from", "tr-to", "tr-key"].forEach((id) => $(id).addEventListener("change", renderTranspose));
-  $("tr-input").addEventListener("input", renderTranspose);
+  fillSelect(byId("tr-from"), [["C", "実音（C）"], ...instItems], "C");
+  fillSelect(byId("tr-to"), instItems, "B♭トランペット");
+  fillSelect(byId("tr-key"), FLAT_NAMES.map((n, i) => [i, n]), 10);
+  ["tr-from", "tr-to", "tr-key"].forEach((id) => byId(id).addEventListener("change", renderTranspose));
+  byId("tr-input").addEventListener("input", renderTranspose);
 }
 
 function parseNote(token) {
@@ -1280,17 +1298,18 @@ function parseNote(token) {
     acc += rest[0] === "#" ? 1 : rest[0] === "x" ? 2 : -1;
     rest = rest.slice(1);
   }
-  if (!/^-?\d+$/.test(rest)) return null;
-  return 12 * (parseInt(rest, 10) + 1) + base + acc;
+  const octave = parseInt(rest, 10);
+  if (!Number.isFinite(octave) || String(octave) !== rest) return null;
+  return 12 * (octave + 1) + base + acc;
 }
 
 function renderTranspose() {
-  const from = $("tr-from").value;
-  const to = $("tr-to").value;
+  const from = byId("tr-from").value;
+  const to = byId("tr-to").value;
   const fromShift = from === "C" ? 0 : INSTRUMENTS[from];
   const toShift = INSTRUMENTS[to];
 
-  const tokens = $("tr-input").value.split(/\s+/).filter(Boolean);
+  const tokens = byId("tr-input").value.split(/\s+/).filter(Boolean);
   const rows = tokens.map((tok) => {
     const m = parseNote(tok);
     if (m === null) return { "入力": tok, "実音": "解析不可", "変換後": "" };
@@ -1301,15 +1320,16 @@ function renderTranspose() {
       "変換後": midiToName(concert + toShift),
     };
   });
-  $("tr-table").innerHTML = rows.length
+  byId("tr-table").innerHTML = rows.length
     ? tableHTML(["入力", "実音", "変換後"], rows)
-    : `<p class="hint" style="padding: 0 12px 12px;">音名を入力してください。</p>`;
+    : '<p class="hint" style="padding: 0 12px 12px;">音名を入力してください。</p>';
 
-  const k = Number($("tr-key").value);
-  $("tr-key-result").innerHTML =
-    `${escapeHTML(to)} の楽譜上の調` +
-    `<strong>${escapeHTML(FLAT_NAMES[mod(k + toShift, 12)])}</strong>` +
-    `<span class="hint">実音 ${escapeHTML(FLAT_NAMES[k])} → 記譜 ${escapeHTML(FLAT_NAMES[mod(k + toShift, 12)])}</span>`;
+  const k = Number(byId("tr-key").value);
+  const writtenKey = FLAT_NAMES[mod(k + toShift, 12)];
+  byId("tr-key-result").innerHTML =
+    escapeHTML(to) + " の楽譜上の調" +
+    "<strong>" + escapeHTML(writtenKey) + "</strong>" +
+    '<span class="hint">実音 ' + escapeHTML(FLAT_NAMES[k]) + " → 記譜 " + escapeHTML(writtenKey) + "</span>";
 }
 
 /* =========================================================
@@ -1317,31 +1337,31 @@ function renderTranspose() {
    ========================================================= */
 
 function initSlur() {
-  $("slur-combos").innerHTML = VALVE_COMBOS.map(
-    (c) => `<label class="chip"><input type="checkbox" value="${c}" checked>${escapeHTML(valveSymbols(c))}</label>`
+  byId("slur-combos").innerHTML = VALVE_COMBOS.map(
+    (c) => '<label class="chip"><input type="checkbox" value="' + c + '" checked>' + escapeHTML(valveSymbols(c)) + "</label>"
   ).join("");
-  $("slur-combos").addEventListener("change", renderSlur);
-  ["slur-low", "slur-high", "slur-pattern"].forEach((id) => $(id).addEventListener("change", renderSlur));
-  $("slur-bpm").addEventListener("input", (e) => {
-    $("slur-bpm-value").textContent = e.target.value;
+  byId("slur-combos").addEventListener("change", renderSlur);
+  ["slur-low", "slur-high", "slur-pattern"].forEach((id) => byId(id).addEventListener("change", renderSlur));
+  byId("slur-bpm").addEventListener("input", (e) => {
+    byId("slur-bpm-value").textContent = e.target.value;
   });
-  $("slur-play").addEventListener("click", () => {
+  byId("slur-play").addEventListener("click", () => {
     const data = slurData();
     if (data.error || !data.notes.length) return;
     const len = data.order.length;
-    togglePlayback("slur", $("slur-play"), data.notes, Number($("slur-bpm").value), (i) =>
+    togglePlayback("slur", byId("slur-play"), data.notes, Number(byId("slur-bpm").value), (i) =>
       highlightRow("slur-table", Math.floor(i / len))
     );
   });
 }
 
 function slurData() {
-  const combos = VALVE_COMBOS.filter((c) =>
-    $("slur-combos").querySelector(`input[value="${c}"]`).checked
+  const combos = VALVE_COMBOS.filter(
+    (c) => byId("slur-combos").querySelector('input[value="' + c + '"]').checked
   );
-  const low = Number($("slur-low").value);
-  const high = Number($("slur-high").value);
-  const pattern = $("slur-pattern").value;
+  const low = Number(byId("slur-low").value);
+  const high = Number(byId("slur-high").value);
+  const pattern = byId("slur-pattern").value;
   if (high <= low) return { error: "最高倍音は最低倍音より大きくしてください。" };
 
   const partials = Object.keys(PARTIAL_OFFSETS)
@@ -1361,7 +1381,7 @@ function slurData() {
     const seq = order.map((p) => fund + PARTIAL_OFFSETS[p]);
     notes.push(...seq);
     rows.push({
-      "運指": { html: `${valveHTML(c, "small")}<span class="quiz-label">${escapeHTML(valveText(c))}</span>` },
+      "運指": { html: valveCellHTML(c) },
       "記譜音の流れ": seq.map(midiToName).join(" → "),
     });
   });
@@ -1371,17 +1391,17 @@ function slurData() {
 function renderSlur() {
   if (sequenceOwner && sequenceOwner.id === "slur") stopSequence();
   const data = slurData();
-  const err = $("slur-error");
+  const err = byId("slur-error");
   if (data.error) {
     err.textContent = data.error;
     err.classList.remove("hidden");
-    $("slur-table").innerHTML = "";
+    byId("slur-table").innerHTML = "";
     return;
   }
   err.classList.add("hidden");
-  $("slur-table").innerHTML = data.rows.length
+  byId("slur-table").innerHTML = data.rows.length
     ? tableHTML(["運指", "記譜音の流れ"], data.rows)
-    : `<p class="hint" style="padding: 0 12px 12px;">運指を1つ以上選択してください。</p>`;
+    : '<p class="hint" style="padding: 0 12px 12px;">運指を1つ以上選択してください。</p>';
 }
 
 /* =========================================================
@@ -1389,17 +1409,17 @@ function renderSlur() {
    ========================================================= */
 
 function initMenu() {
-  fillSelect($("menu-focus"), MENU_FOCUS.map((f) => [f, f]), "バランス");
-  $("menu-minutes").addEventListener("input", renderMenu);
-  $("menu-focus").addEventListener("change", renderMenu);
+  fillSelect(byId("menu-focus"), MENU_FOCUS.map((f) => [f, f]), "バランス");
+  byId("menu-minutes").addEventListener("input", renderMenu);
+  byId("menu-focus").addEventListener("change", renderMenu);
 }
 
 function renderMenu() {
-  const total = Number($("menu-minutes").value);
-  const focus = $("menu-focus").value;
-  $("menu-minutes-value").textContent = total;
+  const total = Number(byId("menu-minutes").value);
+  const focus = byId("menu-focus").value;
+  byId("menu-minutes-value").textContent = total;
 
-  const weights = { ...MENU_BASE };
+  const weights = Object.assign({}, MENU_BASE);
   if (MENU_BOOST[focus]) weights[MENU_BOOST[focus]] += 0.12;
   const totalW = Object.values(weights).reduce((a, b) => a + b, 0);
 
@@ -1409,8 +1429,8 @@ function renderMenu() {
     sum += minutes;
     return { "項目": k, "時間(分)": minutes, "ポイント": MENU_TIPS[k] };
   });
-  $("menu-table").innerHTML = tableHTML(["項目", "時間(分)", "ポイント"], rows);
-  $("menu-total").textContent = `合計: ${sum} 分（四捨五入のため設定時間と多少異なる場合があります）`;
+  byId("menu-table").innerHTML = tableHTML(["項目", "時間(分)", "ポイント"], rows);
+  byId("menu-total").textContent = "合計: " + sum + " 分（四捨五入のため設定時間と多少異なる場合があります）";
 }
 
 /* =========================================================
@@ -1422,7 +1442,7 @@ if (!Array.isArray(logData)) logData = [];
 logData = logData
   .filter((r) => r && typeof r.date === "string")
   .map((r) => ({
-    id: String(r.id || Date.now().toString(36) + Math.random().toString(36).slice(2, 6)),
+    id: String(r.id || newId()),
     date: r.date,
     minutes: clamp(parseInt(r.minutes, 10) || 0, 0, 600),
     category: String(r.category || "その他"),
@@ -1436,44 +1456,47 @@ function saveLog() {
 }
 
 function sortedLog() {
-  return [...logData].sort((a, b) => (a.date === b.date ? (a.id < b.id ? 1 : -1) : a.date < b.date ? 1 : -1));
+  return [...logData].sort((a, b) => {
+    if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+    return a.id < b.id ? 1 : -1;
+  });
 }
 
 function initLog() {
-  fillSelect($("log-category"), LOG_CATEGORIES.map((c) => [c, c]), LOG_CATEGORIES[0]);
-  $("log-date").value = isoDate(new Date());
-  $("log-rating").addEventListener("input", (e) => {
-    $("log-rating-value").textContent = e.target.value;
+  fillSelect(byId("log-category"), LOG_CATEGORIES.map((c) => [c, c]), LOG_CATEGORIES[0]);
+  byId("log-date").value = isoDate(new Date());
+  byId("log-rating").addEventListener("input", (e) => {
+    byId("log-rating-value").textContent = e.target.value;
   });
 
-  $("log-form").addEventListener("submit", (e) => {
+  byId("log-form").addEventListener("submit", (e) => {
     e.preventDefault();
-    const date = $("log-date").value;
+    const date = byId("log-date").value;
     if (!date) return;
     logData.push({
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      id: newId(),
       date,
-      minutes: clamp(parseInt($("log-minutes").value, 10) || 1, 1, 600),
-      category: $("log-category").value,
-      content: $("log-content").value.trim(),
-      rating: Number($("log-rating").value),
-      memo: $("log-memo").value.trim(),
+      minutes: clamp(parseInt(byId("log-minutes").value, 10) || 1, 1, 600),
+      category: byId("log-category").value,
+      content: byId("log-content").value.trim(),
+      rating: Number(byId("log-rating").value),
+      memo: byId("log-memo").value.trim(),
     });
     saveLog();
-    $("log-content").value = "";
-    $("log-memo").value = "";
-    $("log-minutes").value = 30;
-    $("log-rating").value = 3;
-    $("log-rating-value").textContent = "3";
-    const msg = $("log-saved");
+    byId("log-content").value = "";
+    byId("log-memo").value = "";
+    byId("log-minutes").value = 30;
+    byId("log-rating").value = 3;
+    byId("log-rating-value").textContent = "3";
+    const msg = byId("log-saved");
     msg.classList.remove("hidden");
     setTimeout(() => msg.classList.add("hidden"), 2000);
     renderLog();
   });
 
-  $("log-export").addEventListener("click", exportCSV);
+  byId("log-export").addEventListener("click", exportCSV);
 
-  $("log-clear").addEventListener("click", () => {
+  byId("log-clear").addEventListener("click", () => {
     if (!logData.length) return;
     if (confirm("すべての練習記録を削除します。元に戻せません。よろしいですか？")) {
       logData = [];
@@ -1482,7 +1505,7 @@ function initLog() {
     }
   });
 
-  $("log-table").addEventListener("click", (e) => {
+  byId("log-table").addEventListener("click", (e) => {
     const btn = e.target.closest("[data-id]");
     if (!btn) return;
     if (confirm("この記録を削除しますか？")) {
@@ -1495,17 +1518,17 @@ function initLog() {
 
 function renderLog() {
   const empty = logData.length === 0;
-  $("log-empty").classList.toggle("hidden", !empty);
-  $("log-data").classList.toggle("hidden", empty);
+  byId("log-empty").classList.toggle("hidden", !empty);
+  byId("log-data").classList.toggle("hidden", empty);
   if (empty) return;
 
   const total = logData.reduce((a, r) => a + r.minutes, 0);
   const days = new Set(logData.map((r) => r.date)).size;
   const weekStart = daysAgoISO(6);
   const week = logData.filter((r) => r.date >= weekStart).reduce((a, r) => a + r.minutes, 0);
-  $("stat-total").textContent = `${total} 分`;
-  $("stat-days").textContent = `${days} 日`;
-  $("stat-week").textContent = `${week} 分`;
+  byId("stat-total").textContent = total + " 分";
+  byId("stat-days").textContent = days + " 日";
+  byId("stat-week").textContent = week + " 分";
 
   // 日別（直近14日）
   const daily = [];
@@ -1517,16 +1540,16 @@ function renderLog() {
     });
   }
   const maxDaily = Math.max(1, ...daily.map((d) => d.minutes));
-  $("log-daily").innerHTML = daily
+  byId("log-daily").innerHTML = daily
     .map((d) => {
       const pct = (d.minutes / maxDaily) * 75;
-      const label = `${Number(d.date.slice(5, 7))}/${Number(d.date.slice(8, 10))}`;
+      const label = Number(d.date.slice(5, 7)) + "/" + Number(d.date.slice(8, 10));
       return (
-        `<div class="bar-col" title="${d.date}: ${d.minutes}分">` +
-        `<span class="bar-value">${d.minutes > 0 ? d.minutes : ""}</span>` +
-        `<div class="bar${d.minutes === 0 ? " zero" : ""}" style="height: ${pct.toFixed(1)}%"></div>` +
-        `<span class="bar-label">${label}</span>` +
-        `</div>`
+        '<div class="bar-col" title="' + d.date + ": " + d.minutes + '分">' +
+        '<span class="bar-value">' + (d.minutes > 0 ? d.minutes : "") + "</span>" +
+        '<div class="bar' + (d.minutes === 0 ? " zero" : "") + '" style="height: ' + pct.toFixed(1) + '%"></div>' +
+        '<span class="bar-label">' + label + "</span>" +
+        "</div>"
       );
     })
     .join("");
@@ -1538,14 +1561,14 @@ function renderLog() {
   });
   const cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
   const maxCat = Math.max(1, ...cats.map((c) => c[1]));
-  $("log-category-chart").innerHTML = cats
+  byId("log-category-chart").innerHTML = cats
     .map(
       ([name, min]) =>
-        `<div class="hbar-row">` +
-        `<span>${escapeHTML(name)}</span>` +
-        `<div class="hbar-track"><div class="hbar-fill" style="width: ${((min / maxCat) * 100).toFixed(1)}%"></div></div>` +
-        `<span class="hbar-value">${min} 分</span>` +
-        `</div>`
+        '<div class="hbar-row">' +
+        "<span>" + escapeHTML(name) + "</span>" +
+        '<div class="hbar-track"><div class="hbar-fill" style="width: ' + ((min / maxCat) * 100).toFixed(1) + '%"></div></div>' +
+        '<span class="hbar-value">' + min + " 分</span>" +
+        "</div>"
     )
     .join("");
 
@@ -1557,14 +1580,14 @@ function renderLog() {
     "内容": r.content,
     "調子": "★".repeat(r.rating) + "☆".repeat(5 - r.rating),
     "メモ": r.memo,
-    "操作": { html: `<button class="btn danger-outline del-btn" data-id="${escapeHTML(r.id)}">削除</button>` },
+    "操作": { html: '<button class="btn danger-outline del-btn" data-id="' + escapeHTML(r.id) + '">削除</button>' },
   }));
-  $("log-table").innerHTML = tableHTML(["日付", "時間(分)", "カテゴリ", "内容", "調子", "メモ", "操作"], rows);
+  byId("log-table").innerHTML = tableHTML(["日付", "時間(分)", "カテゴリ", "内容", "調子", "メモ", "操作"], rows);
 }
 
 function csvCell(value) {
   const s = String(value ?? "");
-  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
 function exportCSV() {
@@ -1578,7 +1601,7 @@ function exportCSV() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `practice_log_${isoDate(new Date())}.csv`;
+  a.download = "practice_log_" + isoDate(new Date()) + ".csv";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -1591,7 +1614,7 @@ function exportCSV() {
 
 function renderAll() {
   updateTransposeInfo();
-  $("tuner-inst").textContent = settings.instrument;
+  byId("tuner-inst").textContent = settings.instrument;
   refreshRefOptions();
   updateRefInfo();
   renderFingering();
@@ -1623,3 +1646,5 @@ window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(drawStability, 150);
 });
+
+window.__appLoaded = true;
