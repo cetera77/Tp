@@ -1,0 +1,448 @@
+<!-- Output: html -->
+<!-- File: index.html -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#071226">
+  <meta name="description" content="トランペット奏者のためのチューナー・メトロノーム・運指表・練習記録アプリ">
+  <title>Trumpet Toolkit</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎺</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-icon">🎺</span>
+      <div>
+        <h1>Trumpet Toolkit</h1>
+        <p class="brand-sub">Practice Suite for Trumpet Players</p>
+      </div>
+    </div>
+    <div class="settings">
+      <label>楽器
+        <select id="instrument"></select>
+      </label>
+      <label>基準ピッチ A4 = <span id="a4-value">442.0</span> Hz
+        <input type="range" id="a4" min="430" max="450" step="0.5">
+      </label>
+      <label>音量
+        <input type="range" id="volume" min="0.05" max="1" step="0.05">
+      </label>
+      <label class="check">
+        <input type="checkbox" id="use-flats">♭表記
+      </label>
+    </div>
+    <p class="transpose-info" id="transpose-info"></p>
+  </header>
+
+  <div class="tabs-wrap">
+    <nav class="tabs" id="tabs">
+      <button class="tab" data-tab="tuner">チューナー</button>
+      <button class="tab" data-tab="metronome">メトロノーム</button>
+      <button class="tab" data-tab="fingering">運指表</button>
+      <button class="tab" data-tab="scale">スケール</button>
+      <button class="tab" data-tab="transpose">移調</button>
+      <button class="tab" data-tab="slur">リップスラー</button>
+      <button class="tab" data-tab="menu">練習メニュー</button>
+      <button class="tab" data-tab="log">練習記録</button>
+    </nav>
+  </div>
+
+  <main>
+    <!-- チューナー -->
+    <section class="panel" id="tab-tuner">
+      <div class="grid two">
+        <div class="card">
+          <div class="card-head">
+            <h2>リアルタイムチューナー</h2>
+            <button class="btn primary" id="tuner-toggle">🎤 マイク開始</button>
+          </div>
+          <svg class="gauge" viewBox="0 0 300 170" aria-hidden="true">
+            <defs>
+              <linearGradient id="arcGrad" x1="0" x2="1" y1="0" y2="0">
+                <stop offset="0%" stop-color="#ff5c7a"/>
+                <stop offset="35%" stop-color="#2f8cff"/>
+                <stop offset="50%" stop-color="#2ee6a6"/>
+                <stop offset="65%" stop-color="#2f8cff"/>
+                <stop offset="100%" stop-color="#ff5c7a"/>
+              </linearGradient>
+            </defs>
+            <g id="gauge-ticks"></g>
+            <line class="needle" id="needle" x1="150" y1="150" x2="150" y2="42"/>
+            <circle class="needle-hub" cx="150" cy="150" r="7"/>
+          </svg>
+          <div class="tuner-readout idle" id="tuner-readout">
+            <div class="note-big" id="tuner-written">--</div>
+            <div class="note-caption">記譜音（<span id="tuner-inst"></span>）</div>
+            <div class="stats-row">
+              <div class="stat">
+                <span class="stat-label">実音</span>
+                <span class="stat-value" id="tuner-concert">--</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">周波数</span>
+                <span class="stat-value" id="tuner-freq">--</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">ずれ</span>
+                <span class="stat-value" id="tuner-cents">--</span>
+              </div>
+            </div>
+          </div>
+          <p class="tuner-status" id="tuner-status">「マイク開始」を押してロングトーンを吹いてください。</p>
+          <label class="field">ノイズゲート: <span id="tuner-gate-value">0.010</span>（上げると小さな音・雑音を無視）
+            <input type="range" id="tuner-gate" min="0.002" max="0.05" step="0.001" value="0.01">
+          </label>
+        </div>
+
+        <div>
+          <div class="card">
+            <h2>ピッチ安定性</h2>
+            <canvas class="chart" id="stability-canvas"></canvas>
+            <p class="hint">緑の帯は ±5 cent。標準偏差: <strong id="stability-std">--</strong>（小さいほど安定）</p>
+          </div>
+          <div class="card">
+            <h2>基準音</h2>
+            <div class="row">
+              <label class="field">記譜音
+                <select id="ref-note"></select>
+              </label>
+              <button class="btn primary" id="ref-toggle">▶ 再生</button>
+            </div>
+            <p class="hint" id="ref-info"></p>
+            <p class="hint">チューナーと同時に使う場合はイヤホンを推奨します。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- メトロノーム -->
+    <section class="panel" id="tab-metronome">
+      <div class="grid two">
+        <div class="card">
+          <h2>メトロノーム</h2>
+          <div class="bpm-display"><span id="bpm-value">80</span><small>BPM</small></div>
+          <div class="bpm-controls">
+            <button class="btn icon" data-bpm-step="-5">−5</button>
+            <button class="btn icon" data-bpm-step="-1">−1</button>
+            <input type="range" id="bpm-range" min="20" max="300" value="80">
+            <button class="btn icon" data-bpm-step="1">+1</button>
+            <button class="btn icon" data-bpm-step="5">+5</button>
+          </div>
+          <div class="beat-dots" id="beat-dots"></div>
+          <div class="row">
+            <label class="field">テンポ
+              <input type="number" id="bpm-input" min="20" max="300" value="80">
+            </label>
+            <label class="field">拍子
+              <select id="metro-beats"></select>
+            </label>
+            <label class="field">細分化
+              <select id="metro-subdiv">
+                <option value="1">なし</option>
+                <option value="2">8分</option>
+                <option value="3">3連</option>
+                <option value="4">16分</option>
+              </select>
+            </label>
+          </div>
+          <div class="row">
+            <label class="check"><input type="checkbox" id="metro-accent" checked>1拍目にアクセント</label>
+          </div>
+          <div class="row center">
+            <button class="btn primary big" id="metro-toggle">▶ スタート</button>
+            <button class="btn big" id="metro-tap">TAP</button>
+          </div>
+          <p class="hint center-text">このタブ表示中はスペースキーでスタート/ストップ</p>
+        </div>
+
+        <div class="card">
+          <h2>テンポアップ練習</h2>
+          <div class="row">
+            <label class="field">開始テンポ
+              <input type="number" id="trainer-start" min="20" max="300" value="60">
+            </label>
+            <label class="field">目標テンポ
+              <input type="number" id="trainer-target" min="20" max="300" value="120">
+            </label>
+          </div>
+          <div class="row">
+            <label class="field">増加幅
+              <input type="number" id="trainer-step" min="1" max="20" value="4">
+            </label>
+            <label class="field">何小節ごと
+              <input type="number" id="trainer-bars" min="1" max="64" value="4">
+            </label>
+          </div>
+          <div class="plan" id="trainer-plan"></div>
+          <div class="row">
+            <button class="btn" id="trainer-set">開始テンポをセット</button>
+            <label class="check"><input type="checkbox" id="trainer-auto">自動テンポアップ</label>
+          </div>
+          <p class="hint">手動で進める場合は、各テンポで3回連続ミスなく演奏できたら次へ進むのが目安です。自動テンポアップをONにすると、指定小節ごとに目標テンポまで自動で上がります。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 運指表 -->
+    <section class="panel" id="tab-fingering">
+      <div class="card">
+        <h2>運指表（3本ピストン・記譜音）</h2>
+        <div class="alert info hidden" id="fing-piccolo">ピッコロトランペットは4番ピストン付きの機種が多く、運指が異なる場合があります。以下は3本ピストンの標準運指です。</div>
+        <div class="slider-row">
+          <button class="btn icon" id="fing-prev">◀</button>
+          <input type="range" id="fing-slider" min="0" max="30" step="1">
+          <button class="btn icon" id="fing-next">▶</button>
+        </div>
+        <div class="fing-display">
+          <div class="stat big-stat">
+            <span class="stat-label">記譜音</span>
+            <span class="stat-value xl" id="fing-written">--</span>
+          </div>
+          <div class="stat big-stat">
+            <span class="stat-label">実音</span>
+            <span class="stat-value xl" id="fing-concert">--</span>
+          </div>
+          <div class="fing-valves">
+            <div id="fing-valves"></div>
+            <div class="fing-text" id="fing-text"></div>
+          </div>
+          <div>
+            <button class="btn primary" id="fing-play">▶ 試聴</button>
+          </div>
+        </div>
+        <p class="hint" id="fing-alt"></p>
+        <div class="alert warn hidden" id="fing-slide"></div>
+      </div>
+
+      <div class="grid two">
+        <div class="card">
+          <h2>運指一覧</h2>
+          <div class="table-wrap" id="fing-table"></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h2>運指クイズ</h2>
+            <span class="score" id="quiz-score">0 / 0</span>
+          </div>
+          <p class="quiz-question" id="quiz-question"></p>
+          <div class="quiz-options" id="quiz-options"></div>
+          <div class="alert hidden" id="quiz-feedback"></div>
+          <button class="btn primary" id="quiz-next">次の問題</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- スケール -->
+    <section class="panel" id="tab-scale">
+      <div class="card">
+        <h2>スケール練習</h2>
+        <div class="row">
+          <label class="field">主音（記譜音）
+            <select id="scale-key"></select>
+          </label>
+          <label class="field">種類
+            <select id="scale-type"></select>
+          </label>
+          <label class="field">開始オクターブ
+            <select id="scale-octave">
+              <option value="3">3</option>
+              <option value="4" selected>4</option>
+              <option value="5">5</option>
+            </select>
+          </label>
+          <label class="field">方向
+            <select id="scale-direction">
+              <option value="up">上行</option>
+              <option value="updown">上行＋下行</option>
+            </select>
+          </label>
+        </div>
+        <div class="row">
+          <label class="field">テンポ（1音 = 1拍）: <span id="scale-bpm-value">90</span> BPM
+            <input type="range" id="scale-bpm" min="40" max="200" value="90">
+          </label>
+          <button class="btn primary" id="scale-play">▶ 再生</button>
+        </div>
+        <div class="alert warn hidden" id="scale-warning">運指表の範囲（記譜 F#3〜C6）外の音が含まれています。</div>
+        <div class="table-wrap" id="scale-table"></div>
+      </div>
+    </section>
+
+    <!-- 移調 -->
+    <section class="panel" id="tab-transpose">
+      <div class="grid two">
+        <div class="card">
+          <h2>音名の移調</h2>
+          <p class="hint">音名をスペース区切りで入力してください（例: B♭4 C5 D5 E♭5 / Bb4 C#5）。</p>
+          <div class="row">
+            <label class="field">元の楽譜
+              <select id="tr-from"></select>
+            </label>
+            <label class="field">変換先
+              <select id="tr-to"></select>
+            </label>
+          </div>
+          <label class="field">音名
+            <input type="text" id="tr-input" value="Bb4 C5 D5 Eb5 F5">
+          </label>
+          <div class="table-wrap spaced" id="tr-table"></div>
+        </div>
+        <div class="card">
+          <h2>調の変換</h2>
+          <label class="field">元の調（実音）
+            <select id="tr-key"></select>
+          </label>
+          <div class="key-result" id="tr-key-result"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- リップスラー -->
+    <section class="panel" id="tab-slur">
+      <div class="card">
+        <h2>リップスラー生成</h2>
+        <p class="hint">同じ運指で倍音を移動するリップスラー練習を生成します。</p>
+        <div class="field-label">運指（上から順に実行）</div>
+        <div class="chips" id="slur-combos"></div>
+        <div class="row">
+          <label class="field">最低倍音
+            <select id="slur-low">
+              <option value="2" selected>第2倍音</option>
+              <option value="3">第3倍音</option>
+              <option value="4">第4倍音</option>
+              <option value="5">第5倍音</option>
+            </select>
+          </label>
+          <label class="field">最高倍音
+            <select id="slur-high">
+              <option value="3">第3倍音</option>
+              <option value="4" selected>第4倍音</option>
+              <option value="5">第5倍音</option>
+              <option value="6">第6倍音</option>
+              <option value="8">第8倍音</option>
+            </select>
+          </label>
+          <label class="field">パターン
+            <select id="slur-pattern">
+              <option value="updown">上行→下行</option>
+              <option value="up">上行のみ</option>
+              <option value="down">下行のみ</option>
+              <option value="jump">跳躍（最低↔最高）</option>
+            </select>
+          </label>
+        </div>
+        <div class="row">
+          <label class="field">テンポ（1音 = 1拍）: <span id="slur-bpm-value">72</span> BPM
+            <input type="range" id="slur-bpm" min="40" max="180" value="72">
+          </label>
+          <button class="btn primary" id="slur-play">▶ 再生</button>
+        </div>
+        <div class="alert error hidden" id="slur-error"></div>
+        <div class="table-wrap" id="slur-table"></div>
+        <p class="hint">第7倍音は平均律から大きく低くずれるため除外しています。</p>
+      </div>
+    </section>
+
+    <!-- 練習メニュー -->
+    <section class="panel" id="tab-menu">
+      <div class="card">
+        <h2>今日の練習メニュー</h2>
+        <div class="row">
+          <label class="field">練習時間: <span id="menu-minutes-value">60</span> 分
+            <input type="range" id="menu-minutes" min="15" max="180" step="5" value="60">
+          </label>
+          <label class="field">重点項目
+            <select id="menu-focus"></select>
+          </label>
+        </div>
+        <div class="table-wrap" id="menu-table"></div>
+        <p class="hint" id="menu-total"></p>
+        <p class="hint">練習時間と同じくらいの休憩を挟むことが、唇の疲労を防ぐ目安としてよく推奨されます。</p>
+      </div>
+    </section>
+
+    <!-- 練習記録 -->
+    <section class="panel" id="tab-log">
+      <div class="card">
+        <h2>記録する</h2>
+        <form id="log-form" autocomplete="off">
+          <div class="row">
+            <label class="field">日付
+              <input type="date" id="log-date" required>
+            </label>
+            <label class="field">時間（分）
+              <input type="number" id="log-minutes" min="1" max="600" value="30" required>
+            </label>
+            <label class="field">カテゴリ
+              <select id="log-category"></select>
+            </label>
+          </div>
+          <label class="field">内容
+            <input type="text" id="log-content" maxlength="200">
+          </label>
+          <div class="row">
+            <label class="field narrow">調子: <span id="log-rating-value">3</span> / 5
+              <input type="range" id="log-rating" min="1" max="5" value="3">
+            </label>
+            <label class="field">メモ
+              <input type="text" id="log-memo" maxlength="300">
+            </label>
+          </div>
+          <button type="submit" class="btn primary">記録する</button>
+          <span class="saved-msg hidden" id="log-saved">記録しました</span>
+        </form>
+      </div>
+
+      <div class="alert info hidden" id="log-empty">まだ記録がありません。</div>
+
+      <div id="log-data">
+        <div class="stat-cards">
+          <div class="stat-card">
+            <span class="stat-label">総練習時間</span>
+            <span class="value" id="stat-total">0 分</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">練習日数</span>
+            <span class="value" id="stat-days">0 日</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">直近7日間</span>
+            <span class="value" id="stat-week">0 分</span>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div class="card">
+            <h2>日別練習時間（直近14日）</h2>
+            <div class="bar-chart" id="log-daily"></div>
+          </div>
+          <div class="card">
+            <h2>カテゴリ別練習時間</h2>
+            <div id="log-category-chart"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>記録一覧</h2>
+            <div class="btn-group">
+              <button class="btn" id="log-export">CSVをダウンロード</button>
+              <button class="btn danger-outline" id="log-clear">すべて削除</button>
+            </div>
+          </div>
+          <div class="table-wrap" id="log-table"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    Trumpet Toolkit v2.0.0 ・ 音声と記録データはこの端末の外へ送信されません
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
