@@ -10,6 +10,32 @@
   <title>Trumpet Toolkit</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎺</text></svg>">
   <link rel="stylesheet" href="style.css">
+  <script>
+    (function () {
+      function showBootError(msg) {
+        var target = document.body || document.documentElement;
+        var box = document.createElement("div");
+        box.style.cssText = "position:fixed;left:8px;right:8px;bottom:8px;z-index:9999;padding:12px;background:#b00020;color:#fff;font:14px/1.5 sans-serif;border-radius:8px;white-space:pre-wrap;word-break:break-all;";
+        box.textContent = "⚠ " + msg;
+        target.appendChild(box);
+      }
+      window.addEventListener("error", function (e) {
+        var file = (e.filename || "").split("/").pop();
+        showBootError((e.message || "不明なエラー") + "\n" + file + " : " + (e.lineno || "?") + "行目");
+      });
+      window.addEventListener("unhandledrejection", function (e) {
+        showBootError("Promiseエラー: " + (e.reason && e.reason.message ? e.reason.message : e.reason));
+      });
+      window.addEventListener("load", function () {
+        if (getComputedStyle(document.body).backgroundImage === "none") {
+          showBootError("style.css が読み込まれていません。ファイルを直接開かず、GitHub Pages または localhost で開いてください。");
+        }
+        if (!window.__appLoaded) {
+          showBootError("app.js が読み込まれていないか、途中でエラーが発生しています。");
+        }
+      });
+    })();
+  </script>
 </head>
 <body>
   <header class="app-header">
